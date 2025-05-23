@@ -2,16 +2,17 @@ import streamlit as st
 import pandas as pd
 import datetime
 from io import BytesIO
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-# Set page config
-st.set_page_config(page_title="Trading Journal", layout="wide")
-st.title("Trading Journal")
+st.set_page_config(page_title="Smart Trading Journal", layout="wide")
+st.title("Smart Trading Journal")
 
 # Initialize session state
 if 'trades' not in st.session_state:
     st.session_state.trades = []
 
-# Sidebar for user settings
+# Sidebar for settings
 with st.sidebar:
     st.header("User Settings")
     dark_mode = st.checkbox("Dark Mode")
@@ -72,23 +73,58 @@ with st.form("Log a Trade", clear_on_submit=True):
 # Convert to DataFrame
 df = pd.DataFrame(st.session_state.trades)
 
-# Show Dashboard
-st.subheader("Trade Analytics")
+# Analytics section
+st.subheader("Smart Analysis")
 if not df.empty:
-    st.metric("Total Trades", len(df))
-    st.metric("Win Rate", f"{(df['outcome'] == 'Profit').mean() * 100:.2f}%")
-    st.metric("Average R", f"{((df['exit_price'] - df['entry_price']) / (df['entry_price'] - df['stop_loss'])).mean():.2f}")
+    st.markdown("### 1. Emotion-Performance Analysis")
+    emotion_stats = df.groupby("emotions")["outcome"].value_counts().unstack().fillna(0)
+    emotion_stats = emotion_stats.apply(lambda x: x / x.sum(), axis=1) * 100
 
-    st.line_chart(df['exit_price'])
+    fig1, ax1 = plt.subplots()
+    emotion_stats.plot(kind='bar', stacked=True, ax=ax1)
+    ax1.set_ylabel("Percentage")
+    ax1.set_title("Outcome by Emotion")
+    st.pyplot(fig1)
+
+    st.markdown("### 2. Strategy Effectiveness")
+    strategy_stats = df.groupby("strategy")["outcome"].value_counts().unstack().fillna(0)
+    strategy_stats = strategy_stats.apply(lambda x: x / x.sum(), axis=1) * 100
+
+    fig2, ax2 = plt.subplots()
+    strategy_stats.plot(kind='bar', stacked=True, ax=ax2)
+    ax2.set_ylabel("Percentage")
+    ax2.set_title("Outcome by Strategy")
+    st.pyplot(fig2)
+
+    st.markdown("### 3. Pre-Trade Advisory Assistant")
+    with st.form("Pre-Trade Advisor"):
+        st.info("This tool gives you feedback based on your emotional state and strategy choice")
+        current_emotion = st.select_slider("Current Emotion", options=["Calm", "Neutral", "Anxious", "Overconfident", "Fearful", "Greedy"])
+        selected_strategy = st.selectbox("Planned Strategy", ["Breakout", "Pullback", "News-based", "Other"])
+        advisory = st.form_submit_button("Get Advisory")
+        if advisory:
+            emotion_outcome = emotion_stats.loc[current_emotion].get("Loss", 0)
+            strategy_outcome = strategy_stats.loc[selected_strategy].get("Loss", 0)
+
+            if emotion_outcome > 50:
+                st.warning(f"You tend to lose {emotion_outcome:.1f}% of trades when feeling {current_emotion}. Consider waiting or adjusting your size.")
+            else:
+                st.success(f"You usually perform well when {current_emotion}. Proceed with discipline.")
+
+            if strategy_outcome > 50:
+                st.warning(f"Your {selected_strategy} strategy has a high loss rate ({strategy_outcome:.1f}%). Review your setup carefully.")
+            else:
+                st.success(f"{selected_strategy} strategy is generally effective for you.")
+
+    st.subheader("Trade Data Table")
     st.dataframe(df)
 
-    # Export option
     buffer = BytesIO()
     df.to_csv(buffer, index=False)
     st.download_button(
         label="Download CSV",
         data=buffer.getvalue(),
-        file_name="trading_journal.csv",
+        file_name="smart_trading_journal.csv",
         mime="text/csv"
     )
 else:
